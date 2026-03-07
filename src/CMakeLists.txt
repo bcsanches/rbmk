@@ -9,4 +9,5 @@ set(MY_DEFINITION
 
 add_compile_definitions(${MY_DEFINITION})
 
+add_subdirectory(Common)
 add_subdirectory(Engine)
