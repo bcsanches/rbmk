@@ -20,6 +20,7 @@ namespace rbmk::Math
 
 		inline void operator*=(Float_t s) noexcept { x *= s; y *= s; z *= s; }
 		inline void operator+=(const Vec3 &v) noexcept { x += v.x; y += v.y; z += v.z; }
+		inline void operator-=(const Vec3 &v) noexcept { x -= v.x; y -= v.y; z -= v.z; }
 
 		inline void Normalize() noexcept;
 		inline void Zero() noexcept;

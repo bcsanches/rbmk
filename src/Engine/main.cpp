@@ -74,15 +74,20 @@ struct Hit
 	rbmk::Math::Vec3 point;
 };
 
-bool intersectSphere(const Ray &ray, const Sphere &sphere, float &t)
+inline bool intersectSphere(const Ray &ray, const Sphere &sphere, float &t) noexcept
 {
-	auto oc = ray.origin - sphere.center;
+#if 0
+	auto oc{ ray.origin };
+	oc -= sphere.center;
+#else
+	const auto oc{ ray.origin - sphere.center };
+#endif
 
-	float a = ray.dir.Dot(ray.dir);
-	float b = 2.0f * oc.Dot(ray.dir);
-	float c = oc.Dot(oc) - sphere.radius * sphere.radius;
+	const float a = ray.dir.Dot(ray.dir);
+	const float b = 2.0f * oc.Dot(ray.dir);
+	const float c = oc.Dot(oc) - sphere.radius * sphere.radius;
 
-	float disc = b * b - 4 * a * c;
+	const float disc = b * b - 4 * a * c;
 
 	if (disc < 0)
 		return false;
