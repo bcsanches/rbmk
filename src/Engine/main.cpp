@@ -362,7 +362,7 @@ static JobSystem g_jobSystem;
 
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
-	constexpr auto NUM_SPHERES = 5;
+	constexpr auto NUM_SPHERES = 6;
 	static Sphere spheres[NUM_SPHERES];
 
 	spheres[0] = { { -2.5f,0,-3 }, 1, {1, 0, 0} };
@@ -370,6 +370,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 	spheres[2] = { { 2.5f,0,-3 }, 1, {0, 0, 1} };
 	spheres[3] = { { 4.5f,0,-3 }, 1.2f, {1, 0, 1} };
 	spheres[4] = { { 6.5f,0,-3 }, 1.2f, {1, 1, 1} };
+	spheres[5] = { { 0,2,2 }, 0.5f, {1, 1, 1} };
 
 	Brush cube;
 
@@ -462,13 +463,52 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 						for (const auto &light : lights)
 						{
 							auto lightDir = light.position - hit;
-							lightDir.Normalize();
+							float lightDist = lightDir.Length();
 
-							float diffuse = std::max(0.0f, normal.Dot(lightDir));
+							//normalize...
+							lightDir *= 1.0f / lightDist;							
 
-							auto lightContribution = hitSphere->color * light.color * diffuse * light.intensity;
+							Ray shadowRay;
 
-							finalColor = finalColor + lightContribution;
+							shadowRay.origin = hit + normal * 0.001f;
+							shadowRay.dir = lightDir;
+
+							bool inShadow = false;
+
+							for (auto &s : spheres)
+							{
+								if (&s == hitSphere)
+									continue;
+
+								float tShadow;
+
+								if (intersectSphere(shadowRay, s, tShadow))
+								{
+									if (tShadow < lightDist)
+									{
+										inShadow = true;
+										break;
+									}
+								}
+							}
+
+							if (!inShadow)
+							{
+								Hit shadowHit;
+								if (intersectBrush(shadowRay, cube, shadowHit))
+								{
+									inShadow = true;
+								}
+							}
+
+							if (!inShadow)
+							{
+								float diffuse = std::max(0.0f, normal.Dot(lightDir));
+
+								auto lightContribution = hitSphere->color * light.color * diffuse * light.intensity;
+
+								finalColor += lightContribution;
+							}
 						}						
 
 						pixels[y * WIDTH + x] = packColor(finalColor);

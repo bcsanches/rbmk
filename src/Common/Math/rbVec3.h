@@ -18,6 +18,7 @@ namespace rbmk::Math
 		inline Vec3 operator*(Float_t s) const noexcept { return { x * s,y * s,z * s }; }
 		inline Vec3 operator*(const Vec3 &v) const noexcept { return { x * v.x,y * v.y,z * v.z }; }
 
+		inline void operator*=(Float_t s) noexcept { x *= s; y *= s; z *= s; }
 		inline void operator+=(const Vec3 &v) noexcept { x += v.x; y += v.y; z += v.z; }
 
 		inline void Normalize() noexcept;
