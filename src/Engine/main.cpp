@@ -22,8 +22,6 @@ static SDL_Window *window = nullptr;
 static SDL_Renderer *renderer = nullptr;
 static SDL_Texture *texture = nullptr;
 
-static SDL_FRect mouseposrect;
-
 static Uint32 pixels[WIDTH * HEIGHT];
 
 struct Ray
@@ -47,6 +45,16 @@ struct Plane
 struct Brush
 {
 	std::vector<Plane> planes;
+};
+
+struct Camera
+{
+	rbmk::Math::Vec3 position;
+
+	float yaw;
+	float pitch;
+
+	float fov;
 };
 
 bool intersectSphere(const Ray &ray, const Sphere &sphere, float &t)
@@ -237,6 +245,8 @@ private:
 	std::atomic<bool> stop;
 };
 
+static Camera camera;
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
 	if (!SDL_Init(SDL_INIT_VIDEO)) 
@@ -265,8 +275,20 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 		return SDL_APP_FAILURE;
 	}
 
+	SDL_SetWindowRelativeMouseMode(window, true);
+
+	camera.position = { 0,0,2 };
+	camera.yaw = 3.14159f;
+	camera.pitch = 0;
+	camera.fov = 90.0f * 3.14159f / 180.0f;
+
 	return SDL_APP_CONTINUE;
 }
+
+static float moveFwd = 0;
+static float moveStrafe = 0;
+static float rotateYaw = 0;
+static float rotatePitch = 0;
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
@@ -280,12 +302,27 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 			{
 				return SDL_APP_SUCCESS;
 			}
+
+			if(event->key.scancode == SDL_SCANCODE_W)
+				moveFwd = 1;
+			else if(event->key.scancode == SDL_SCANCODE_S)
+				moveFwd = -1;
+			else if(event->key.scancode == SDL_SCANCODE_A)
+				moveStrafe = -1;
+			else if(event->key.scancode == SDL_SCANCODE_D)
+				moveStrafe = 1;
 			break;
 
-		case SDL_EVENT_MOUSE_MOTION:  /* keep track of the latest mouse position */
-			/* center the square where the mouse is */
-			mouseposrect.x = event->motion.x - (mouseposrect.w / 2);
-			mouseposrect.y = event->motion.y - (mouseposrect.h / 2);
+		case SDL_EVENT_KEY_UP:
+			if(event->key.scancode == SDL_SCANCODE_W || event->key.scancode == SDL_SCANCODE_S)
+				moveFwd = 0;
+			else if(event->key.scancode == SDL_SCANCODE_A || event->key.scancode == SDL_SCANCODE_D)
+				moveStrafe = 0;
+			break;
+
+		case SDL_EVENT_MOUSE_MOTION: 
+			rotateYaw = event->motion.x;
+			rotatePitch = event->motion.y;			
 			break;
 	}
 
@@ -318,22 +355,50 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 		{{0,-1,0},-1},
 		{{0,0, 1},-3},
 		{{0,0,-1}, 1}
+	};		
+
+	rbmk::Math::Vec3 camFwd =
+	{
+		cos(camera.pitch) * sin(camera.yaw),
+		sin(camera.pitch),
+		cos(camera.pitch) * cos(camera.yaw)
 	};
 
+	camFwd.Normalize();	
+	rbmk::Math::Vec3 worldUp{ 0,1,0 };
+
+	auto camRight = rbmk::Math::Vec3::Cross(camFwd, worldUp);
+	camRight.Normalize();
+
+	auto camUp = rbmk::Math::Vec3::Cross(camRight, camFwd);
+
+	const float speed = 0.05f;
+	camera.position += camFwd * moveFwd * speed;
+	camera.position += camRight * moveStrafe * speed;	
+
+	camera.pitch += rotatePitch * 0.0002f;
+	camera.yaw += rotateYaw * 0.0002f;
+
+	rotateYaw = rotatePitch = 0;
 
 #if 1
 	for (int y = 0; y < HEIGHT; y++)
 	{
-		g_jobSystem.Submit([y, light, cube]()
+		g_jobSystem.Submit([y, light, cube, camFwd, camRight, camUp]()
 			{
 				for (int x = 0; x < WIDTH; x++)
 				{
-					float px = (2 * (x + 0.5f) / WIDTH - 1) * (WIDTH / (float)HEIGHT);
-					float py = 1 - 2 * (y + 0.5f) / HEIGHT;
+					float scale = tan(camera.fov * 0.5f);
+
+					float px = (2 * (x + 0.5f) / WIDTH - 1) * scale * (WIDTH / (float)HEIGHT);
+					float py = (1 - 2 * (y + 0.5f) / HEIGHT) * scale;
+
+					auto rayDir = camFwd + camRight * px + camUp * py;
 
 					Ray ray;
-					ray.origin = { 0,0,0 };
-					ray.dir = rbmk::Math::Vec3::Normalize(px, py, -1);
+					ray.origin = camera.position;
+					ray.dir = rayDir;
+					ray.dir.Normalize();
 
 					float dist = 9999999999.0f;
 					float t;
