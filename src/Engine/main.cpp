@@ -15,8 +15,8 @@
 
 #include "Math/rbVec3.h"
 
-const int WIDTH = 800;
-const int HEIGHT = 600;
+const int WIDTH = 640;
+const int HEIGHT = 480;
 
 static SDL_Window *window = nullptr;
 static SDL_Renderer *renderer = nullptr;
@@ -370,7 +370,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 	spheres[2] = { { 2.5f,0,-3 }, 1, {0, 0, 1} };
 	spheres[3] = { { 4.5f,0,-3 }, 1.2f, {1, 0, 1} };
 	spheres[4] = { { 6.5f,0,-3 }, 1.2f, {1, 1, 1} };
-	spheres[5] = { { 0,2,2 }, 0.5f, {1, 1, 1} };
+	spheres[5] = { { -0.5f,1.5f,2 }, 0.5f, {1, 1, 1} };
 
 	Brush cube;
 
@@ -527,18 +527,48 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
 							for (const auto &light : lights)
 							{
-								rbmk::Math::Vec3 lightDir = light.position - hit.point;
-								lightDir.Normalize();
+								auto lightDir = light.position - hit.point;
+								float lightDist = lightDir.Length();
 
-								float diffuse = std::max(0.0f, hit.normal.Dot(lightDir));
+								//normalize...
+								lightDir *= 1.0f / lightDist;
 
-								auto contribution =
-									cube.color *
-									light.color *
-									diffuse *
-									light.intensity;
+								Ray shadowRay;
 
-								finalColor += contribution;
+								shadowRay.origin = hit.point + hit.normal * 0.001f;
+								shadowRay.dir = lightDir;
+
+								bool inShadow = false;
+
+								for (auto &s : spheres)
+								{
+									if (&s == hitSphere)
+										continue;
+
+									float tShadow;
+
+									if (intersectSphere(shadowRay, s, tShadow))
+									{
+										if (tShadow < lightDist)
+										{
+											inShadow = true;
+											break;
+										}
+									}
+								}								
+
+								if (!inShadow)
+								{
+									float diffuse = std::max(0.0f, hit.normal.Dot(lightDir));
+
+									auto contribution =
+										cube.color *
+										light.color *
+										diffuse *
+										light.intensity;
+
+									finalColor += contribution;
+								}								
 							}
 							
 							pixels[y * WIDTH + x] = packColor(finalColor);
