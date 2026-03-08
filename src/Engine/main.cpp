@@ -34,6 +34,8 @@ struct Sphere
 {
 	rbmk::Math::Vec3 center;
 	float radius;
+
+	rbmk::Math::Vec3 color;
 };
 
 struct Plane
@@ -45,6 +47,7 @@ struct Plane
 struct Brush
 {
 	std::vector<Plane> planes;
+	rbmk::Math::Vec3 color{ 1,1,1 };
 };
 
 struct Camera
@@ -55,6 +58,20 @@ struct Camera
 	float pitch;
 
 	float fov;
+};
+
+struct Light
+{
+	rbmk::Math::Vec3 position;
+	rbmk::Math::Vec3 color;
+	float intensity;
+};
+
+struct Hit
+{
+	float t;
+	rbmk::Math::Vec3 normal;
+	rbmk::Math::Vec3 point;
 };
 
 bool intersectSphere(const Ray &ray, const Sphere &sphere, float &t)
@@ -89,8 +106,7 @@ bool intersectPlane(const Ray &ray, const Plane &plane, float &t)
 bool intersectBrush(
 	const Ray &ray,
 	const Brush &brush,
-	float &tHit,
-	rbmk::Math::Vec3 &normal)
+	Hit &hit)
 {
 	float tEnter = 0.0f;
 	float tExit = 1e30f;
@@ -133,21 +149,25 @@ bool intersectBrush(
 	if (!enterPlane)
 		return false;
 
-	tHit = tEnter;
-	normal = enterPlane->normal;
+	hit.t = tEnter;
+	hit.normal = enterPlane->normal;
+	hit.point = ray.origin + ray.dir * tEnter;
 
 	return true;
 }
 
-struct Hit
-{
-	float t;
-	rbmk::Math::Vec3 normal;
-};
-
 Uint32 packColor(int r, int g, int b)
 {
 	return (255 << 24) | (r << 16) | (g << 8) | b;
+}
+
+Uint32 packColor(const rbmk::Math::Vec3 &color)
+{
+	int r = std::min(255, (int)(color.x * 255));
+	int g = std::min(255, (int)(color.y * 255));
+	int b = std::min(255, (int)(color.z * 255));
+	
+	return packColor(r, g, b);
 }
 
 class JobSystem
@@ -246,6 +266,12 @@ private:
 };
 
 static Camera camera;
+static std::vector<Light> lights =
+{
+	{{-5,5,-2},{1,1,1},1.0f},   // luz branca
+	{{5,3,-3},{1,0,0},0.7f},    // luz vermelha
+	{{0,6,-5},{0,0,1},0.7f}     // luz azul
+};
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
@@ -336,15 +362,14 @@ static JobSystem g_jobSystem;
 
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
-	constexpr auto NUM_SPHERES = 3;
+	constexpr auto NUM_SPHERES = 5;
 	static Sphere spheres[NUM_SPHERES];
 
-	spheres[0] = { { -1.5f,0,-3 }, 1 };
-	spheres[1] = { { 0,0,-3 }, 1 };
-	spheres[2] = { { 1.5f,0,-3 }, 1 };	
-
-	rbmk::Math::Vec3 light{1,1,-1};
-	light.Normalize();
+	spheres[0] = { { -2.5f,0,-3 }, 1, {1, 0, 0} };
+	spheres[1] = { { 0,0,-3 }, 1, {0, 1, 0} };
+	spheres[2] = { { 2.5f,0,-3 }, 1, {0, 0, 1} };
+	spheres[3] = { { 4.5f,0,-3 }, 1.2f, {1, 0, 1} };
+	spheres[4] = { { 6.5f,0,-3 }, 1.2f, {1, 1, 1} };
 
 	Brush cube;
 
@@ -376,20 +401,28 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 	camera.position += camFwd * moveFwd * speed;
 	camera.position += camRight * moveStrafe * speed;	
 
-	camera.pitch += rotatePitch * 0.0002f;
-	camera.yaw += rotateYaw * 0.0002f;
+	float mx, my;
+	SDL_GetRelativeMouseState(&mx, &my);
+
+	float sensitivity = 0.002f;
+
+	camera.yaw -= mx * sensitivity;
+	camera.pitch += -my * sensitivity;
 
 	rotateYaw = rotatePitch = 0;
+
+	float scale = tan(camera.fov * 0.5f);
+
+	rbmk::Math::Vec3 light{ 1,1,-1 };
+	light.Normalize();
 
 #if 1
 	for (int y = 0; y < HEIGHT; y++)
 	{
-		g_jobSystem.Submit([y, light, cube, camFwd, camRight, camUp]()
+		g_jobSystem.Submit([y, light,  cube, camFwd, camRight, camUp, scale]()
 			{
 				for (int x = 0; x < WIDTH; x++)
-				{
-					float scale = tan(camera.fov * 0.5f);
-
+				{					
 					float px = (2 * (x + 0.5f) / WIDTH - 1) * scale * (WIDTH / (float)HEIGHT);
 					float py = (1 - 2 * (y + 0.5f) / HEIGHT) * scale;
 
@@ -400,43 +433,75 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 					ray.dir = rayDir;
 					ray.dir.Normalize();
 
-					float dist = 9999999999.0f;
-					float t;
+					float closestT = 1e30f;
+					Sphere *hitSphere = nullptr;
 
 					pixels[y * WIDTH + x] = packColor(30, 30, 50);
 					for (auto i = 0; i < NUM_SPHERES; i++)
 					{
+						float t;
 						if (intersectSphere(ray, spheres[i], t))
 						{
-							if (t >= dist)
-								continue;
-
-							dist = t;
-
-							auto hit = ray.origin + ray.dir * t;
-							auto normal = hit - spheres[i].center;
-							normal.Normalize();
-
-							float diffuse = std::max(0.0f, normal.Dot(light));
-
-							int c = (int)(diffuse * 255);
-
-							pixels[y * WIDTH + x] = packColor(c, c, c);
-
-							break;
+							if (t < closestT)
+							{
+								closestT = t;
+								hitSphere = &spheres[i];
+							}
 						}
+					}
+
+					if (hitSphere)
+					{			
+						auto hit = ray.origin + ray.dir * closestT;
+						auto normal = hit - hitSphere->center;
+						normal.Normalize();
+
+						rbmk::Math::Vec3 finalColor;
+						finalColor.Zero();
+
+						for (const auto &light : lights)
+						{
+							auto lightDir = light.position - hit;
+							lightDir.Normalize();
+
+							float diffuse = std::max(0.0f, normal.Dot(lightDir));
+
+							auto lightContribution = hitSphere->color * light.color * diffuse * light.intensity;
+
+							finalColor = finalColor + lightContribution;
+						}						
+
+						pixels[y * WIDTH + x] = packColor(finalColor);
 					}
 
 					Hit hit;
 
-					if (intersectBrush(ray, cube, hit.t, hit.normal))
+					if (intersectBrush(ray, cube, hit))
 					{
-						if (hit.t < dist)
+						if (hit.t < closestT)
 						{
-							dist = hit.t;
-							float diffuse = std::max(0.0f, hit.normal.Dot(light));
-							int c = (int)(diffuse * 255);
-							pixels[y * WIDTH + x] = packColor(c, 0, 0);
+							closestT = hit.t;
+
+							rbmk::Math::Vec3 finalColor;
+							finalColor.Zero();
+
+							for (const auto &light : lights)
+							{
+								rbmk::Math::Vec3 lightDir = light.position - hit.point;
+								lightDir.Normalize();
+
+								float diffuse = std::max(0.0f, hit.normal.Dot(lightDir));
+
+								auto contribution =
+									cube.color *
+									light.color *
+									diffuse *
+									light.intensity;
+
+								finalColor += contribution;
+							}
+							
+							pixels[y * WIDTH + x] = packColor(finalColor);
 						}
 
 						//Vec3 hit = ray.origin + ray.dir * tBrush;

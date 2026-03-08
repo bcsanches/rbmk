@@ -16,6 +16,7 @@ namespace rbmk::Math
 		inline Vec3 operator+(const Vec3 &v) const noexcept { return { x + v.x,y + v.y,z + v.z }; }
 		inline Vec3 operator-(const Vec3 &v) const noexcept { return { x - v.x,y - v.y,z - v.z }; }
 		inline Vec3 operator*(Float_t s) const noexcept { return { x * s,y * s,z * s }; }
+		inline Vec3 operator*(const Vec3 &v) const noexcept { return { x * v.x,y * v.y,z * v.z }; }
 
 		inline void operator+=(const Vec3 &v) noexcept { x += v.x; y += v.y; z += v.z; }
 
@@ -23,6 +24,8 @@ namespace rbmk::Math
 		inline void Zero() noexcept;
 		
 		inline Float_t Dot(const Vec3 &rhs) const noexcept;
+
+		inline Float_t Length() const noexcept;
 
 		inline static Vec3 Normalize(Float_t x, Float_t y, Float_t z) noexcept;
 		inline static Vec3 Cross(const Vec3 &a, const Vec3 &b) noexcept;
@@ -51,9 +54,14 @@ namespace rbmk::Math
 		return x * rhs.x + y * rhs.y + z * rhs.z;
 	}
 
+	inline Float_t Vec3::Length() const noexcept
+	{
+		return Sqrtf(this->Dot(*this));
+	}
+
 	void Vec3::Normalize() noexcept
 	{
-		auto len = 1.0f / Sqrtf(this->Dot(*this));
+		auto len = 1.0f / this->Length();
 
 		this->x *= len;
 		this->y *= len;
