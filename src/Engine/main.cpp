@@ -76,23 +76,23 @@ struct Hit
 
 inline bool intersectSphere(const Ray &ray, const Sphere &sphere, float &t) noexcept
 {
-#if 0
-	auto oc{ ray.origin };
-	oc -= sphere.center;
-#else
 	const auto oc{ ray.origin - sphere.center };
-#endif
 
-	const float a = ray.dir.Dot(ray.dir);
-	const float b = 2.0f * oc.Dot(ray.dir);
-	const float c = oc.Dot(oc) - sphere.radius * sphere.radius;
+	float b = oc.Dot(ray.dir);
+	float c = oc.Dot(oc) - sphere.radius * sphere.radius;
 
-	const float disc = b * b - 4 * a * c;
+	float discriminant = b * b - c;
 
-	if (disc < 0)
+	if (discriminant < 0)
 		return false;
 
-	t = (-b - (float)sqrt(disc)) / (2.0f * a);
+	float sqrtD = sqrt(discriminant);
+
+	float t0 = -b - sqrtD;
+	float t1 = -b + sqrtD;
+
+	t = (t0 > 0) ? t0 : t1;
+
 	return t > 0;
 }
 
