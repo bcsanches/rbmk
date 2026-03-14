@@ -31,6 +31,7 @@ set_property(TARGET fmt PROPERTY FOLDER "contrib")
 set_property(TARGET fmt-c PROPERTY FOLDER "contrib")
 set_property(TARGET SDL_uclibc PROPERTY FOLDER "contrib")
 set_property(TARGET SDL3-shared PROPERTY FOLDER "contrib")
+set_property(TARGET spdlog PROPERTY FOLDER "contrib")
 
 set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
 
