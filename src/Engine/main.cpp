@@ -15,6 +15,8 @@
 
 #include "Math/rbVec3.h"
 
+#include "Camera.h"
+
 const int WIDTH = 640;
 const int HEIGHT = 480;
 
@@ -48,16 +50,6 @@ struct Brush
 {
 	std::vector<Plane> planes;
 	rbmk::Math::Vec3 color{ 1,1,1 };
-};
-
-struct Camera
-{
-	rbmk::Math::Vec3 position;
-
-	float yaw;
-	float pitch;
-
-	float fov;
 };
 
 struct Light
@@ -309,9 +301,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 	SDL_SetWindowRelativeMouseMode(window, true);
 
 	camera.position = { 0,0,2 };
-	camera.yaw = 3.14159f;
-	camera.pitch = 0;
-	camera.fov = 90.0f * 3.14159f / 180.0f;
 
 	return SDL_APP_CONTINUE;
 }
@@ -390,9 +379,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
 	rbmk::Math::Vec3 camFwd =
 	{
-		cos(camera.pitch) * sin(camera.yaw),
-		sin(camera.pitch),
-		cos(camera.pitch) * cos(camera.yaw)
+		camera.pitch.Cos() * camera.yaw.Sin(),
+		camera.pitch.Sin(),
+		camera.pitch.Cos() * camera.yaw.Cos()
 	};
 
 	camFwd.Normalize();	
@@ -412,12 +401,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
 	float sensitivity = 0.002f;
 
-	camera.yaw -= mx * sensitivity;
-	camera.pitch += -my * sensitivity;
+	camera.yaw -= rbmk::Math::Radian{ mx * sensitivity };
+	camera.pitch += rbmk::Math::Radian{ -my * sensitivity };
 
 	rotateYaw = rotatePitch = 0;
 
-	float scale = tan(camera.fov * 0.5f);
+	const float scale = (camera.fov * 0.5f).Tan();
 
 	rbmk::Math::Vec3 light{ 1,1,-1 };
 	light.Normalize();

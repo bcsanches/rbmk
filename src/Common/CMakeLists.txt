@@ -6,6 +6,7 @@ file(GLOB_RECURSE SRC_MATH
 
 set(CommonLib_HDRS
 	rbTypes.h
+	Math/rbAngle.h
     Math/rbUtils.h
 	Math/rbVec3.h
 )

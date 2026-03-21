@@ -1,9 +1,13 @@
 
 set(Engine_SRCS
+	Camera.cpp
+	Camera.h	
 	main.cpp
 	RenderSystem.h
 	RenderSystemRT.cpp
 	RenderSystemRT.h
+	RenderWorld.cpp
+	RenderWorld.h
 )
 
 add_executable(Engine  ${Engine_SRCS})
