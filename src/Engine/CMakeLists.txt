@@ -3,6 +3,8 @@ set(Engine_SRCS
 	Camera.cpp
 	Camera.h	
 	main.cpp
+	Model.cpp
+	Model.h
 	RenderSystem.h
 	RenderSystemRT.cpp
 	RenderSystemRT.h

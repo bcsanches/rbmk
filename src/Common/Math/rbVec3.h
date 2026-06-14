@@ -30,7 +30,7 @@ namespace rbmk::Math
 		inline Float_t Length() const noexcept;
 
 		inline static Vec3 Normalize(Float_t x, Float_t y, Float_t z) noexcept;
-		inline static Vec3 Cross(const Vec3 &a, const Vec3 &b) noexcept;
+		inline static Vec3 Cross(const Vec3 &a, const Vec3 &b) noexcept;		
 	};
 
 	inline Vec3::Vec3() noexcept
